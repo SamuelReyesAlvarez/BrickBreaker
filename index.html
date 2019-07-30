@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Brick Breacker</title>
+</head>
+
+<body style="text-align: center;">
+    <canvas id="gameCanvas" width="800" height="600" style="border: white solid 5px;"></canvas>
+    <script>
+        // @author: Samuel Reyes Alvarez
+        // @version: 0 (30/07/2019)
+        var canvas;
+        var canvasContext;
+        var ballX;
+        var ballSpeedX;
+        var ballY;
+        var ballSpeedY;
+        var ballRadius;
+        var paddleX;
+        var flag;
+        var playerScore;
+        var lives;
+        var bricksLeft;
+        var brickGrid;
+        var winner;
+        var looser;
+
+        var started = false;
+
+        const SPEED = 30;
+        const SEPARATION = 20;
+        const PADDLE_WIDTH = 100;
+        const PADDLE_HEIGHT = 15;
+        const INITIAL_LIVES = 3;
+        const BRICK_WIDTH = 80;
+        const BRICK_HEIGHT = 20;
+        const BRICK_GAP = 2;
+        const BRICK_COLUMNS = 10;
+        const BRICK_ROWS = 10;
+
+        window.onload = function () {
+            canvas = document.getElementById('gameCanvas');
+            canvasContext = canvas.getContext('2d');
+            canvasContext.textAlign = "center";
+
+            initVars();
+            resetBricks();
+
+            setInterval(function () {
+                moveEverything();
+                drawEverything();
+            }, 1000 / SPEED);
+
+            canvas.addEventListener('mousedown', handleMouseClick);
+
+            canvas.addEventListener('mousemove', function (evt) {
+                var mousePos = mousePosition(evt);
+                if (mousePos.x >= (PADDLE_WIDTH / 2) - 10 && mousePos.x <= canvas.width + 10 -
+                    PADDLE_WIDTH / 2) {
+                    paddleX = mousePos.x - (PADDLE_WIDTH / 2);
+                }
+            })
+        }
+
+        function moveEverything() {
+            if (winner || !started) {
+                return;
+            }
+
+            ballX += ballSpeedX;
+            ballY += ballSpeedY;
+
+            if (!flag && ballY > canvas.height - PADDLE_HEIGHT - ballRadius - SEPARATION) {
+                if (ballX > (paddleX - ballRadius) && ballX < (paddleX + PADDLE_WIDTH + ballRadius)) {
+                    ballSpeedY = -ballSpeedY;
+
+                    var deltaX = ballX - (paddleX + PADDLE_WIDTH / 2);
+                    ballSpeedX = deltaX * 0.35;
+                } else {
+                    flag = true;
+                }
+            }
+
+            if (ballX < 0 + ballRadius || ballX > (canvas.width - ballRadius)) {
+                ballSpeedX = -ballSpeedX;
+            }
+
+            if (ballY < 0 + ballRadius) {
+                ballSpeedY = -ballSpeedY;
+            }
+
+            if (ballY > (canvas.height - ballRadius)) {
+                lives--;
+                ballReset();
+            }
+        }
+
+        function drawEverything() {
+            // Background
+            drawRect(0, 0, canvas.width, canvas.height, 'black');
+
+            if (winner || looser) {
+                printText("white", "32px Arial", "Score " + playerScore, 400, 100);
+                if (winner) {
+                    printText("white", "60px Arial", "YOU WON!!", 400, 300);
+                }
+                if (looser) {
+                    printText("white", "60px Arial", "YOU LOST!!", 400, 300);
+                }
+                printText("white", "14px Arial", "Click to play again", 400, 500);
+                return;
+            }
+
+            drawRect(paddleX, canvas.height - PADDLE_HEIGHT - SEPARATION, PADDLE_WIDTH, PADDLE_HEIGHT, 'white');
+            drawCircle(ballX, ballY, ballRadius * 2, 'white');
+            printText("red", "14px Arial", "Score " + playerScore, 300, canvas.height - 5);
+            printText("red", "14px Arial", "Lives " + lives, 500, canvas.height - 5);
+            drawBricks();
+
+            if (!started) {
+                printText("green", "32px Arial", "Welcome to Brick Breaker", 400, 400);
+                printText("green", "14px Arial", "Click to start the game.", 400, 500);
+                return;
+            }
+        }
+
+        function initVars() {
+            ballX = canvas.width / 2;
+            ballSpeedX = 4;
+            ballY = canvas.height / 2;
+            ballSpeedY = 10;
+            ballRadius = 5;
+            paddleX = 350;
+            flag = false;
+            playerScore = 0;
+            lives = INITIAL_LIVES;
+            bricksLeft = BRICK_COLUMNS * BRICK_ROWS;
+            brickGrid = new Array(BRICK_COLUMNS * BRICK_ROWS);
+            winner = false;
+            looser = false;
+        }
+
+        function ballReset() {
+            if (lives <= 0) {
+                looser = true;
+            }
+
+            flag = false;
+            ballY = canvas.height / 2;
+        }
+
+        function mousePosition(evt) {
+            var rect = canvas.getBoundingClientRect();
+            var root = document.documentElement;
+            var mouseX = evt.clientX - rect.left - root.scrollLeft;
+            var mouseY = evt.clientY - rect.top - root.scrollTop;
+            return {
+                x: mouseX,
+                y: mouseY
+            };
+        }
+
+        function handleMouseClick() {
+            if (winner || looser) {
+                initVars();
+            }
+            started = true;
+        }
+
+        function drawRect(leftX, topY, width, height, drawColor) {
+            canvasContext.fillStyle = drawColor;
+            canvasContext.fillRect(leftX, topY, width, height);
+        }
+
+        function drawCircle(centerX, centerY, radius, drawColor) {
+            canvasContext.fillStyle = drawColor;
+            canvasContext.beginPath();
+            canvasContext.arc(centerX, centerY, radius, 0, Math.PI * 2, true);
+            canvasContext.fill();
+        }
+
+        function printText(drawColor, fontStyle, text, leftX, topY) {
+            canvasContext.fillStyle = drawColor;
+            canvasContext.font = fontStyle;
+            canvasContext.fillText(text, leftX, topY);
+        }
+
+        function drawBricks() {
+            for (let i = 0; i < BRICK_COLUMNS; i++) {
+                for (let j = 0; j < BRICK_ROWS; j++) {
+                    var brickLeftEdgeX = i * BRICK_WIDTH;
+                    var brickTopEdgeY = j * BRICK_HEIGHT;
+                    if (isBrickAtTileCoord(i, j)) {
+                        drawRect(brickLeftEdgeX, brickTopEdgeY, BRICK_WIDTH - BRICK_GAP, BRICK_HEIGHT - BRICK_GAP, 'blue');
+                    }
+                }
+
+            }
+        }
+
+        function resetBricks() {
+            for (var i = 0; i < BRICK_COLUMNS * BRICK_ROWS; i++) {
+                if (Math.random() < 0.5) {
+                    brickGrid[i] = 1;
+                } else {
+                    brickGrid[i] = 0;
+                }
+            }
+        }
+
+        function isBrickAtTileCoord(brickTileCol, brickTileRow) {
+            var brickIndex = brickTileCol + BRICK_COLUMNS * brickTileRow;
+            return (brickGrid[brickIndex] == 1);
+        }
+
+        function removeBrickAtPixelCoord(pixelX, pixelY) {
+            var tileCol = pixelX / BRICK_WIDTH;
+            var tileRow = pixelY / BRICK_HEIGHT;
+
+            tileCol = Math.floor(tileCol);
+            tileRow = Math.floor(tileRow);
+
+            if (tileCol < 0 || tileCol >= BRICK_COLUMNS || tileRow < 0 || tileRow >= BRICK_ROWS) {
+                return;
+            }
+        }
+    </script>
+    <p>by Samuel Reyes Alvarez</p>
+</body>
+
+</html>
