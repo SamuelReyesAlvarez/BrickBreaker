@@ -10,7 +10,7 @@
     <canvas id="gameCanvas" width="800" height="600" style="border: white solid 5px;"></canvas>
     <script>
         // @author: Samuel Reyes Alvarez
-        // @version: 0 (30/07/2019)
+        // @version: 1 (31/07/2019)
         var canvas;
         var canvasContext;
         var ballX;
@@ -23,9 +23,11 @@
         var playerScore;
         var lives;
         var bricksLeft;
+        var consecutiveBreacks;
         var brickGrid;
         var winner;
         var looser;
+        var bestScore;
 
         var started = false;
 
@@ -38,7 +40,8 @@
         const BRICK_HEIGHT = 20;
         const BRICK_GAP = 2;
         const BRICK_COLUMNS = 10;
-        const BRICK_ROWS = 10;
+        const BRICK_ROWS = 13;
+        const POINTS_PER_BREACK = 10;
 
         window.onload = function () {
             canvas = document.getElementById('gameCanvas');
@@ -46,7 +49,6 @@
             canvasContext.textAlign = "center";
 
             initVars();
-            resetBricks();
 
             setInterval(function () {
                 moveEverything();
@@ -72,12 +74,19 @@
             ballX += ballSpeedX;
             ballY += ballSpeedY;
 
+            bounceAndRemoveBrickAtPixelCoord(ballX, ballY);
+
             if (!flag && ballY > canvas.height - PADDLE_HEIGHT - ballRadius - SEPARATION) {
                 if (ballX > (paddleX - ballRadius) && ballX < (paddleX + PADDLE_WIDTH + ballRadius)) {
+                    consecutiveBreacks = 0;
                     ballSpeedY = -ballSpeedY;
 
                     var deltaX = ballX - (paddleX + PADDLE_WIDTH / 2);
                     ballSpeedX = deltaX * 0.35;
+
+                    if (bricksLeft <= 0) {
+                        resetBricks();
+                    }
                 } else {
                     flag = true;
                 }
@@ -98,11 +107,12 @@
         }
 
         function drawEverything() {
-            // Background
             drawRect(0, 0, canvas.width, canvas.height, 'black');
 
             if (winner || looser) {
+                bestScore = bestScore < playerScore ? playerScore : bestScore;
                 printText("white", "32px Arial", "Score " + playerScore, 400, 100);
+                printText("white", "32px Arial", "Best Score " + bestScore, 400, 100);
                 if (winner) {
                     printText("white", "60px Arial", "YOU WON!!", 400, 300);
                 }
@@ -115,8 +125,10 @@
 
             drawRect(paddleX, canvas.height - PADDLE_HEIGHT - SEPARATION, PADDLE_WIDTH, PADDLE_HEIGHT, 'white');
             drawCircle(ballX, ballY, ballRadius * 2, 'white');
-            printText("red", "14px Arial", "Score " + playerScore, 300, canvas.height - 5);
+            printText("red", "14px Arial", "Score " + playerScore, 150, canvas.height - 5);
+            printText("red", "14px Arial", "Best Score " + bestScore, 300, canvas.height - 5);
             printText("red", "14px Arial", "Lives " + lives, 500, canvas.height - 5);
+            printText("red", "14px Arial", "Bricks left " + bricksLeft, 650, canvas.height - 5);
             drawBricks();
 
             if (!started) {
@@ -136,10 +148,13 @@
             flag = false;
             playerScore = 0;
             lives = INITIAL_LIVES;
-            bricksLeft = BRICK_COLUMNS * BRICK_ROWS;
+            bricksLeft = 0;
+            consecutiveBreacks = 0;
             brickGrid = new Array(BRICK_COLUMNS * BRICK_ROWS);
             winner = false;
             looser = false;
+
+            resetBricks();
         }
 
         function ballReset() {
@@ -188,11 +203,11 @@
         }
 
         function drawBricks() {
-            for (let i = 0; i < BRICK_COLUMNS; i++) {
-                for (let j = 0; j < BRICK_ROWS; j++) {
-                    var brickLeftEdgeX = i * BRICK_WIDTH;
-                    var brickTopEdgeY = j * BRICK_HEIGHT;
-                    if (isBrickAtTileCoord(i, j)) {
+            for (let col = 0; col < BRICK_COLUMNS; col++) {
+                for (let row = 0; row < BRICK_ROWS; row++) {
+                    var brickLeftEdgeX = col * BRICK_WIDTH;
+                    var brickTopEdgeY = row * BRICK_HEIGHT;
+                    if (isBrickAtTileCoord(col, row)) {
                         drawRect(brickLeftEdgeX, brickTopEdgeY, BRICK_WIDTH - BRICK_GAP, BRICK_HEIGHT - BRICK_GAP, 'blue');
                     }
                 }
@@ -202,29 +217,67 @@
 
         function resetBricks() {
             for (var i = 0; i < BRICK_COLUMNS * BRICK_ROWS; i++) {
-                if (Math.random() < 0.5) {
+                if (i >= 30) {
                     brickGrid[i] = 1;
-                } else {
-                    brickGrid[i] = 0;
+                    bricksLeft++;
                 }
             }
         }
 
         function isBrickAtTileCoord(brickTileCol, brickTileRow) {
-            var brickIndex = brickTileCol + BRICK_COLUMNS * brickTileRow;
+            var brickIndex = brickTileToIndex(brickTileCol, brickTileRow);
             return (brickGrid[brickIndex] == 1);
         }
 
-        function removeBrickAtPixelCoord(pixelX, pixelY) {
-            var tileCol = pixelX / BRICK_WIDTH;
-            var tileRow = pixelY / BRICK_HEIGHT;
-
-            tileCol = Math.floor(tileCol);
-            tileRow = Math.floor(tileRow);
+        function bounceAndRemoveBrickAtPixelCoord(pixelX, pixelY) {
+            var tileCol = Math.floor(pixelX / BRICK_WIDTH);
+            var tileRow = Math.floor(pixelY / BRICK_HEIGHT);
 
             if (tileCol < 0 || tileCol >= BRICK_COLUMNS || tileRow < 0 || tileRow >= BRICK_ROWS) {
                 return;
             }
+
+            var brickIndex = brickTileToIndex(tileCol, tileRow);
+
+            if (brickGrid[brickIndex] == 1) {
+                var prevTileCol = Math.floor((ballX - ballSpeedX) / BRICK_WIDTH);
+                var prevTileRow = Math.floor((ballY - ballSpeedY) / BRICK_HEIGHT);
+
+                var bothTestFailed = true;
+                var adjacentBrickIndex;
+
+                if (prevTileCol != tileCol) {
+                    adjacentBrickIndex = brickTileToIndex(prevTileCol, tileRow);
+
+                    if (brickGrid[adjacentBrickIndex] != 1) {
+                        ballSpeedX *= -1;
+                        bothTestFailed = false;
+                    }
+                }
+
+                if (prevTileRow != tileRow) {
+                    adjacentBrickIndex = brickTileToIndex(tileCol, prevTileRow);
+
+                    if (brickGrid[adjacentBrickIndex] != 1) {
+                        ballSpeedY *= -1;
+                        bothTestFailed = false;
+                    }
+                }
+
+                if (bothTestFailed) {
+                    ballSpeedX *= -1;
+                    ballSpeedY *= -1;
+                }
+            
+                brickGrid[brickIndex] = 0;
+                bricksLeft--;
+                playerScore += POINTS_PER_BREACK + (POINTS_PER_BREACK / 2) * consecutiveBreacks;
+                consecutiveBreacks++;
+            }
+        }
+
+        function brickTileToIndex(tileCol, tileRow) {
+            return (tileCol + BRICK_COLUMNS * tileRow);
         }
     </script>
     <p>by Samuel Reyes Alvarez</p>
