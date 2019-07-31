@@ -10,7 +10,7 @@
     <canvas id="gameCanvas" width="800" height="600" style="border: white solid 5px;"></canvas>
     <script>
         // @author: Samuel Reyes Alvarez
-        // @version: 2 (31/07/2019)
+        // @version: 3 (31/07/2019)
         var canvas;
         var canvasContext;
         var ballX;
@@ -111,8 +111,8 @@
 
             if (winner || looser) {
                 bestScore = bestScore < playerScore ? playerScore : bestScore;
-                printText("white", "32px Arial", "Score " + playerScore, 400, 100);
-                printText("white", "32px Arial", "Best Score " + bestScore, 400, 100);
+                printText("white", "32px Arial", "Your Score " + playerScore, 400, 100);
+                printText("white", "24px Arial", "Best Score " + bestScore, 400, 150);
                 if (winner) {
                     printText("white", "60px Arial", "YOU WON!!", 400, 300);
                 }
